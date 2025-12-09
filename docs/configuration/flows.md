@@ -112,6 +112,51 @@ Use interactive buttons for quick choices. WhatsApp automatically shows:
 
 **Store As:** `user_choice` (stores "confirm" or "cancel")
 
+#### Dynamic Buttons (Script)
+
+Use **Message Type: Script** to generate buttons dynamically from database queries.
+
+**Example: List user's recent invoices**
+
+1. Set **Message Type** to `Script`
+2. Set **Input Type** to `Button`
+3. Add script in **Response Script**:
+
+```python
+# Get invoices for this customer (using phone number to find customer)
+customer = frappe.get_value('Customer', {'mobile_no': phone_number}, 'name')
+
+if customer:
+    invoices = frappe.get_all('Sales Invoice',
+        filters={'customer': customer, 'docstatus': 1},
+        fields=['name', 'grand_total', 'posting_date'],
+        order_by='posting_date desc',
+        limit=10
+    )
+
+    if invoices:
+        buttons = [
+            {
+                "id": inv.name,
+                "title": inv.name[:20],
+                "description": f"₹{inv.grand_total} - {inv.posting_date}"
+            }
+            for inv in invoices
+        ]
+        response = {
+            "message": "Select an invoice to view details:",
+            "content_type": "interactive",
+            "buttons": json.dumps(buttons)
+        }
+    else:
+        response = "No invoices found for your account."
+else:
+    response = "Customer not found. Please contact support."
+```
+
+4. Set **Store As** to `selected_invoice`
+5. In the next step, use `{selected_invoice}` to fetch and display details
+
 ### Message Type: Script
 
 Execute Python code to generate dynamic responses. See [Script Responses](../features/scripts.md).

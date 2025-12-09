@@ -484,6 +484,8 @@ class FlowEngine:
         """Run script to generate dynamic response message.
 
         The script should set 'response' variable with the message to return.
+        Response can be a string or dict (for buttons/templates).
+
         Available in script:
             - data: dict of collected session data
             - frappe: frappe module for database queries
@@ -491,13 +493,18 @@ class FlowEngine:
             - session: the current session document
             - phone_number: user's phone number
 
-        Example script:
-            order_id = data.get('order_id')
-            if order_id:
-                order = frappe.get_doc('Sales Order', order_id)
-                response = f"Order {order_id} status: {order.status}"
-            else:
-                response = "Order not found"
+        Example 1 - Simple text:
+            order = frappe.get_doc('Sales Order', data.get('order_id'))
+            response = f"Order status: {order.status}"
+
+        Example 2 - Dynamic buttons (invoices):
+            invoices = frappe.get_all('Sales Invoice',
+                filters={'customer': data.get('customer')},
+                fields=['name', 'grand_total'],
+                limit=10
+            )
+            buttons = [{"id": inv.name, "title": inv.name, "description": f"₹{inv.grand_total}"} for inv in invoices]
+            response = {"message": "Select an invoice:", "content_type": "interactive", "buttons": json.dumps(buttons)}
         """
         try:
             eval_globals = {
