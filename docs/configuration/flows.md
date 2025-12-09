@@ -59,12 +59,18 @@ Each step in the flow is configured in the Steps table. **Drag and drop rows to 
 | **Select** | Choice from options | Must match one of the options |
 | **Button** | Interactive buttons | User must tap a button |
 
-### Buttons
+### Buttons & Lists
 
-Use interactive buttons for yes/no questions or quick choices (max 3 buttons).
+Use interactive buttons for quick choices. WhatsApp automatically shows:
+- **Buttons** (1-3 options) - Displayed as tappable buttons
+- **List Menu** (4-10 options) - Displayed as a dropdown menu
+
+#### Setup
 
 1. Set **Input Type** to `Button`
-2. Add buttons in JSON format:
+2. Add buttons in the **Buttons** field (JSON format with syntax highlighting)
+
+#### Button Format (1-3 options)
 
 ```json
 [
@@ -73,17 +79,38 @@ Use interactive buttons for yes/no questions or quick choices (max 3 buttons).
 ]
 ```
 
-- `id`: Value stored when user taps (use in **Conditional Next**)
-- `title`: Text shown on the button (max 20 chars)
+#### List Format (4-10 options)
 
-Example with conditional navigation:
 ```json
-// Buttons
-[{"id": "continue", "title": "Continue"}, {"id": "cancel", "title": "Cancel"}]
-
-// Conditional Next
-{"continue": "next_step", "cancel": "cancel_step"}
+[
+  {"id": "sales", "title": "Sales", "description": "Talk to sales team"},
+  {"id": "support", "title": "Support", "description": "Get technical help"},
+  {"id": "billing", "title": "Billing", "description": "Payment questions"},
+  {"id": "other", "title": "Other", "description": "Something else"}
+]
 ```
+
+#### Field Reference
+
+| Field | Description | Limit |
+|-------|-------------|-------|
+| `id` | Value stored when user taps (use in Conditional Next) | - |
+| `title` | Text shown on button/list item | 20 chars |
+| `description` | Subtitle (list only, optional) | 72 chars |
+
+#### Example: Confirmation Step
+
+**Buttons field:**
+```json
+[{"id": "confirm", "title": "Confirm"}, {"id": "cancel", "title": "Cancel"}]
+```
+
+**Conditional Next field:**
+```json
+{"confirm": "process_step", "cancel": "cancelled_step", "default": "retry_step"}
+```
+
+**Store As:** `user_choice` (stores "confirm" or "cancel")
 
 ### Message Type: Script
 
