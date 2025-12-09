@@ -97,12 +97,12 @@ class TestFlowEngine(IntegrationTestCase):
             def get_password(self, field):
                 return None
 
-        responder = AIResponder(MockSettings(), phone_number="+1234567890")
-        variants = responder.get_phone_variants("+1234567890")
+        responder = AIResponder(MockSettings(), phone_number="+919876543210")
+        variants = responder.get_phone_variants("+919876543210")
 
-        self.assertIn("+1234567890", variants)
-        self.assertIn("1234567890", variants)
-        self.assertIn("4567890", variants)  # Last 10 digits if > 10
+        self.assertIn("+919876543210", variants)
+        self.assertIn("919876543210", variants)  # Without +
+        self.assertIn("9876543210", variants)  # Last 10 digits (local number)
 
 
 class TestInputValidation(IntegrationTestCase):
