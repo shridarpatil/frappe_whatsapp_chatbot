@@ -1,5 +1,5 @@
 <div align="right">
-	<a href="[https://frappecloud.com/crm/signup](https://cloud.frappe.io/marketplace/apps/frappe_whatsapp_chatbot)" target="_blank">
+	<a href="https://cloud.frappe.io/marketplace/apps/frappe_whatsapp_chatbot" target="_blank">
 		<picture>
 			<source media="(prefers-color-scheme: dark)" srcset="https://frappe.io/files/try-on-fc-white.png">
 			<img src="https://frappe.io/files/try-on-fc-black.png" alt="Try on Frappe Cloud" height="28" />
