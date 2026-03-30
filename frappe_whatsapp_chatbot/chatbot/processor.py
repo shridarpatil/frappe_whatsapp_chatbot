@@ -68,8 +68,8 @@ class ChatbotProcessor:
         if not settings:
             return False
 
-        # Only process text, button, and flow messages
-        if self.content_type not in ["text", "button", "flow"]:
+        # Ensure image and document are allowed in the processing loop
+        if self.content_type not in ["text", "button", "flow", "image", "document"]:
             return False
 
         # Check if this account is configured for chatbot
@@ -444,7 +444,7 @@ def process_incoming_message(doc, method=None):
 
         # Only process text, button, and flow content types
         content_type = getattr(doc, "content_type", None)
-        if content_type not in ["text", "button", "flow"]:
+        if content_type not in ["text", "button", "flow", "image", "document"]:
             return
 
         # Quick check if chatbot is enabled (without full initialization)
@@ -457,15 +457,88 @@ def process_incoming_message(doc, method=None):
         except Exception:
             return
 
+        if content_type in ["text", "button", "flow"]:
+            # Extract message data
+            message_data = {
+                "name": doc_name,
+                "from": getattr(doc, "from", None) or getattr(doc, "from_", None),
+                "message": getattr(doc, "message", "") or "",
+                "content_type": content_type or "text",
+                "whatsapp_account": getattr(doc, "whatsapp_account", None),
+                "type": "Incoming",
+                "flow_response": getattr(doc, "flow_response", None)
+            }
+
+            # Mark as being processed to prevent loops
+            _processing_messages.add(doc_name)
+
+            try:
+                # Process synchronously - this is fast enough and more reliable
+                processor = ChatbotProcessor(message_data)
+                processor.process()
+            finally:
+                # Clean up processing flag
+                _processing_messages.discard(doc_name)
+
+        elif content_type in ["image", "document"]:
+            frappe.enqueue(
+                'frappe_whatsapp_chatbot.chatbot.processor.background_media_processor',
+                doc_name=doc_name,
+                queue='default',
+                at_front=True
+            )
+
+    except Exception as e:
+        # Log error but NEVER re-raise - we must not break the incoming message save
+        try:
+            frappe.log_error(
+                f"process_incoming_message error: {str(e)}",
+                "WhatsApp Chatbot Error"
+            )
+        except Exception:
+            pass  # Even logging failed, just continue
+
+
+def background_media_processor(doc_name):
+    """Wait for attachment link and process media message."""
+    import time
+
+    # 1. Fetch static data ONCE
+    # We get these now so we don't have to keep asking the DB for them in the loop
+    msg_data = frappe.db.get_value(
+        "WhatsApp Message",
+        doc_name,
+        ["from", "content_type", "whatsapp_account", "flow_response"],
+        as_dict=1
+    )
+
+    if not msg_data:
+        return
+
+    # 2. Optimized Polling Loop
+    media_url = None
+    for _ in range(4):
+        time.sleep(2)  # Wait a bit for the downloader to update the record
+
+        # Clear transaction cache to see updates from the downloader
+        frappe.db.rollback()
+
+        # Only fetch the 'attach' field - much lighter than fetching the whole row
+        media_url = frappe.db.get_value("WhatsApp Message", doc_name, "attach")
+
+        if media_url:
+            break
+
+    if media_url:
         # Extract message data
         message_data = {
             "name": doc_name,
-            "from": getattr(doc, "from", None) or getattr(doc, "from_", None),
-            "message": getattr(doc, "message", "") or "",
-            "content_type": content_type or "text",
-            "whatsapp_account": getattr(doc, "whatsapp_account", None),
+            "from": getattr(msg_data, "from", None) or getattr(msg_data, "from_", None),
+            "message": media_url,
+            "content_type": getattr(msg_data, "content_type", ""),
+            "whatsapp_account": getattr(msg_data, "whatsapp_account", None),
             "type": "Incoming",
-            "flow_response": getattr(doc, "flow_response", None)
+            "flow_response": getattr(msg_data, "flow_response", None)
         }
 
         # Mark as being processed to prevent loops
@@ -478,16 +551,8 @@ def process_incoming_message(doc, method=None):
         finally:
             # Clean up processing flag
             _processing_messages.discard(doc_name)
-
-    except Exception as e:
-        # Log error but NEVER re-raise - we must not break the incoming message save
-        try:
-            frappe.log_error(
-                f"process_incoming_message error: {str(e)}",
-                "WhatsApp Chatbot Error"
-            )
-        except Exception:
-            pass  # Even logging failed, just continue
+    else:
+        frappe.log_error(f"Chatbot Timeout: No media found for {doc_name}", "WhatsApp Chatbot Warning")
 
 
 def run_processor(message_data):

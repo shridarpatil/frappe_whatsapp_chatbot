@@ -98,13 +98,13 @@ class SessionManager:
                 "WhatsApp Message",
                 filters={
                     "whatsapp_account": self.account,
-                    "content_type": "text"
+                    "content_type": ["in", ["text", "image", "document"]]
                 },
                 or_filters=[
                     ["from", "=", self.phone_number],
                     ["to", "=", self.phone_number]
                 ],
-                fields=["type", "message", "creation"],
+                fields=["type", "message", "content_type", "attach", "creation"],
                 order_by="creation desc",
                 limit=limit
             )
@@ -114,7 +114,8 @@ class SessionManager:
             for msg in reversed(messages):
                 history.append({
                     "direction": "Incoming" if msg.type == "Incoming" else "Outgoing",
-                    "message": msg.message,
+                    # If it's a media message, use the attach as the message text
+                    "message": msg.attach if msg.content_type in ["image", "document"] else msg.message,
                     "timestamp": msg.creation
                 })
 

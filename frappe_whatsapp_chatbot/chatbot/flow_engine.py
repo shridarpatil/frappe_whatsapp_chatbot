@@ -164,12 +164,23 @@ class FlowEngine:
                     session_data = parse_json(session.session_data, {})
                     session_data[current_step.store_as] = input_value
                     session.session_data = json.dumps(session_data)
+                    # Force a save here to ensure persistence
+                    session.save(ignore_permissions=True)
 
             # Log message in session
             session.add_message("Incoming", user_input, current_step.step_name)
 
             # Determine next step
             next_step_name = self.get_next_step(current_step, flow.steps, user_input, button_payload)
+
+            # If it's an image/file and no conditional match was found,
+            # find the next sequential step so the flow doesn't die.
+            if not next_step_name and current_step.input_type in ["Image", "File"]:
+                sorted_steps = sorted(flow.steps, key=lambda x: x.idx)
+                for i, step in enumerate(sorted_steps):
+                    if step.step_name == current_step.step_name and i < len(sorted_steps) - 1:
+                        next_step_name = sorted_steps[i + 1].step_name
+                        break
 
             if not next_step_name:
                 # No next step, complete flow
@@ -226,6 +237,15 @@ class FlowEngine:
     def validate_input(self, step, user_input, button_payload):
         """Validate user input against step requirements."""
         input_type = step.input_type
+
+        # Use a more flexible check for Image/File
+        if input_type in ["Image", "File"]:
+            val = str(user_input or "").strip()
+            # Valid if it looks like a path or has content (since we know it's media)
+            if val and (val.startswith("/") or "files/" in val or val.startswith("http")):
+                return True, None
+            return False, f"Please upload an {input_type.lower()} to continue."
+
 
         if input_type == "Button":
             # Button responses are always valid (payload or text)
@@ -297,7 +317,8 @@ class FlowEngine:
         if current_step.conditional_next:
             conditions = parse_json(current_step.conditional_next, {})
             if conditions:
-                response_key = button_payload or (user_input.lower() if user_input else "")
+                clean_input = str(user_input or "").strip().lower()
+                response_key = button_payload or clean_input
 
                 if response_key in conditions:
                     return conditions[response_key]
