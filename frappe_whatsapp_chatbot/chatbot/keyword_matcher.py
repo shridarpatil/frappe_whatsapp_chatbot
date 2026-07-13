@@ -75,7 +75,7 @@ class KeywordMatcher:
                     return True
 
             elif rule.match_type == "Contains":
-                if kw in text:
+                if kw in text or kw == "*":
                     return True
 
             elif rule.match_type == "Starts With":
